@@ -1,0 +1,13 @@
+# Ignore pycache
+__pycache__/
+
+# Ignore data and plots
+data/
+plots/
+
+# Ignore jobs and logs
+*.vidjob
+logs/
+
+# Ignore vscode environment files
+.vscode/
