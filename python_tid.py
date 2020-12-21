@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 # from utils import structure_sim
-from ..vif_utils import vif
+from vif_utils import *
 
 from scipy.io import loadmat
 from scipy.stats import spearmanr, pearsonr
@@ -33,6 +33,15 @@ widgets = [
 
 sims = np.zeros((n_dist,))
 
+kh = 5
+sigma = 1.5
+# win = np.exp(-0.5*(np.arange(-kh, kh+1, 1)**2/sigma**2))
+# win = np.outer(win, win)
+# win /= np.sum(win)
+
+win = np.ones((2*kh+1, 2*kh+1))
+win /= np.sum(win)
+
 k = 0
 with progressbar.ProgressBar(max_value=n_dist, widgets=widgets) as bar:
     for i in range(1, n_ref + 1):
@@ -53,7 +62,7 @@ with progressbar.ProgressBar(max_value=n_dist, widgets=widgets) as bar:
             img_dist = cv2.cvtColor(img_dist_, cv2.COLOR_BGR2YUV)[:, :, 0].astype('float32')
 
             # sims[k] = structure_sim(img_ref, img_dist, 2, 2)
-            sims[k] = vif(img_ref, img_dist)
+            sims[k] = vif_spatial(img_ref, img_dist, win)
             k += 1
             bar.update(k, file=k, total=n_dist)
 

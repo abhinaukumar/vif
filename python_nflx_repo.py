@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 # from utils import structure_sim
-from ..vif_utils import vif
+from vif_utils import *
 
 from scipy.io import loadmat, savemat
 from scipy.stats import spearmanr, pearsonr
@@ -40,6 +40,16 @@ sims = np.zeros((n_dist_files,))
 sim_spat_alls = np.empty((n_dist_files,), dtype=object)
 sim_temp_alls = np.empty((n_dist_files,), dtype=object)
 i_dist = 0
+
+kh = 5
+sigma = 1.5
+# win = np.exp(-0.5*(np.arange(-kh, kh+1, 1)**2/sigma**2))
+# win = np.outer(win, win)
+# win /= np.sum(win)
+
+win = np.ones((2*kh+1, 2*kh+1))
+win /= np.sum(win)
+
 with progressbar.ProgressBar(max_value=n_dist_files, widgets=widgets) as bar:
     for i_ref in range(n_ref_files):
         ref_filename = ref_file_list[i_ref][:-4].split('_')[0]
@@ -63,8 +73,8 @@ with progressbar.ProgressBar(max_value=n_dist_files, widgets=widgets) as bar:
                     y_dist = cv2.cvtColor(rgb_dist, cv2.COLOR_BGR2YUV)[:, :, 0].astype('float32')
 
                     # temp.append(structure_sim(y_ref, y_dist, 2, 2))
-                    spat_scores.append(vif(y_ref, y_dist))
-                    temp_scores.append(vif(y_ref - y_ref_prev, y_dist - y_dist_prev))
+                    spat_scores.append(vif_spatial(y_ref, y_dist, win))
+                    temp_scores.append(vif_spatial(y_ref - y_ref_prev, y_dist - y_dist_prev, win))
                     y_ref_prev = y_ref
                     y_dist_prev = y_dist
                 else:
@@ -78,7 +88,8 @@ with progressbar.ProgressBar(max_value=n_dist_files, widgets=widgets) as bar:
             v_ref.set(cv2.CAP_PROP_POS_FRAMES, 0)
             bar.update(i_dist, file=i_dist + 1, total=n_dist_files)
 
-savemat('data/nflx_repo_stvifs.mat', {'spat_vifs': sim_spat_alls, 'temp_vifs': sim_temp_alls})
+# savemat('data/nflx_repo_stvifs.mat', {'spat_vifs': sim_spat_alls, 'temp_vifs': sim_temp_alls})
+savemat('data/nflx_repo_spat_stvifs.mat', {'spat_vifs': sim_spat_alls, 'temp_vifs': sim_temp_alls})
 
 # Fitting logistic function to SSIM
 [[b0, b1, b2, b3, b4], _] = curve_fit(lambda t, b0, b1, b2, b3, b4: b0 * (0.5 - 1.0/(1 + np.exp(b1*(t - b2))) + b3 * t + b4),
@@ -94,4 +105,5 @@ print("PCC:", pcc)
 print("SROCC:", srocc)
 print("RMSE:", rmse)
 
-savemat('data/nflx_repo_stvifs.mat', {'spat_vifs': sim_spat_alls, 'temp_vifs': sim_temp_alls, 'pcc': pcc, 'srocc': srocc, 'rmse': rmse})
+# savemat('data/nflx_repo_stvifs.mat', {'spat_vifs': sim_spat_alls, 'temp_vifs': sim_temp_alls, 'pcc': pcc, 'srocc': srocc, 'rmse': rmse})
+savemat('data/nflx_repo_spat_stvifs.mat', {'spat_vifs': sim_spat_alls, 'temp_vifs': sim_temp_alls, 'pcc': pcc, 'srocc': srocc, 'rmse': rmse})

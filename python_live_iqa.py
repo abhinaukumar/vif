@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 # from utils import structure_sim
-from vif_utils import vif
+from vif_utils import *
 
 from scipy.io import loadmat
 from scipy.stats import spearmanr, pearsonr
@@ -26,6 +26,15 @@ ref_file_list = [fname[0] for fname in f['refnames_all'].squeeze()]
 
 n_files = len(ref_file_list)
 
+kh = 5
+sigma = 1.5
+win = np.exp(-0.5*(np.arange(-kh, kh+1, 1)**2/sigma**2))
+win = np.outer(win, win)
+win /= np.sum(win)
+
+# win = np.ones((2*kh+1, 2*kh+1))
+# win /= np.sum(win)
+
 n_dists = {'jp2k': 227, 'jpeg': 233, 'wn': 174, 'gblur': 174, 'fastfading': 174}
 widgets = [
             progressbar.ETA(),
@@ -45,7 +54,8 @@ with progressbar.ProgressBar(max_value=n_files, widgets=widgets) as bar:
             img_dist = cv2.cvtColor(img_dist_, cv2.COLOR_BGR2YUV)[:, :, 0].astype('float32')
 
             # sims[k + i] = structure_sim(img_ref, img_dist, 2, 2)
-            sims[k + i] = vif(img_ref, img_dist)
+
+            sims[k + i] = vif_spatial(img_ref, img_dist, win)
 
             bar.update(k + i, file=k + i + 1, total=n_files)
 
