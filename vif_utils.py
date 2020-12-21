@@ -1,5 +1,6 @@
 from pyrtools.pyramids import SteerablePyramidSpace as SPyr
 import numpy as np
+from scipy.signal import convolve2d
 
 
 def im2col(img, k, stride=1):
@@ -27,26 +28,29 @@ def moments(x, y, k, stride):
 
     k_norm = k**2
 
-    x_pad = np.pad(x, int((kh - stride)/2), mode='reflect')
-    y_pad = np.pad(y, int((kh - stride)/2), mode='reflect')
+    # x_pad = np.pad(x, int((kh - stride)/2), mode='reflect')
+    # y_pad = np.pad(y, int((kw - stride)/2), mode='reflect')
+
+    x_pad = x
+    y_pad = y
 
     int_1_x = integral_image(x_pad)
     int_1_y = integral_image(y_pad)
 
-    int_2_x = integral_image(x_pad**2)
-    int_2_y = integral_image(y_pad**2)
+    int_2_x = integral_image(x_pad*x_pad)
+    int_2_y = integral_image(y_pad*y_pad)
 
     int_xy = integral_image(x_pad*y_pad)
 
-    mu_x = (int_1_x[:-kh:stride, :-kw:stride] - int_1_x[:-kh:stride, kw::stride] - int_1_x[kh::stride, :-kw:stride] + int_1_x[kh::stride, kw::stride]) / k_norm
-    mu_y = (int_1_y[:-kh:stride, :-kw:stride] - int_1_y[:-kh:stride, kw::stride] - int_1_y[kh::stride, :-kw:stride] + int_1_y[kh::stride, kw::stride]) / k_norm
+    mu_x = (int_1_x[:-kh:stride, :-kw:stride] - int_1_x[:-kh:stride, kw::stride] - int_1_x[kh::stride, :-kw:stride] + int_1_x[kh::stride, kw::stride])
+    mu_y = (int_1_y[:-kh:stride, :-kw:stride] - int_1_y[:-kh:stride, kw::stride] - int_1_y[kh::stride, :-kw:stride] + int_1_y[kh::stride, kw::stride])
 
-    var_x = np.clip((int_2_x[:-kh:stride, :-kw:stride] - int_2_x[:-kh:stride, kw::stride] - int_2_x[kh::stride, :-kw:stride] + int_2_x[kh::stride, kw::stride]) / k_norm - mu_x**2, 0, None)
-    var_y = np.clip((int_2_y[:-kh:stride, :-kw:stride] - int_2_y[:-kh:stride, kw::stride] - int_2_y[kh::stride, :-kw:stride] + int_2_y[kh::stride, kw::stride]) / k_norm - mu_y**2, 0, None)
+    var_x = k_norm*(int_2_x[:-kh:stride, :-kw:stride] - int_2_x[:-kh:stride, kw::stride] - int_2_x[kh::stride, :-kw:stride] + int_2_x[kh::stride, kw::stride]) - mu_x**2
+    var_y = k_norm*(int_2_y[:-kh:stride, :-kw:stride] - int_2_y[:-kh:stride, kw::stride] - int_2_y[kh::stride, :-kw:stride] + int_2_y[kh::stride, kw::stride]) - mu_y**2
 
-    cov_xy = (int_xy[:-kh:stride, :-kw:stride] - int_xy[:-kh:stride, kw::stride] - int_xy[kh::stride, :-kw:stride] + int_xy[kh::stride, kw::stride]) / k_norm - mu_x*mu_y
+    cov_xy = k_norm*(int_xy[:-kh:stride, :-kw:stride] - int_xy[:-kh:stride, kw::stride] - int_xy[kh::stride, :-kw:stride] + int_xy[kh::stride, kw::stride]) - mu_x*mu_y
 
-    return (mu_x, mu_y, var_x, var_y, cov_xy)
+    return (mu_x/k_norm, mu_y/k_norm, var_x/k_norm**2, var_y/k_norm**2, cov_xy/k_norm**2)
 
 
 def vif_gsm_model(pyr, subband_keys, M):
@@ -163,3 +167,53 @@ def vif(img_ref, img_dist):
 
     return np.sum(nums)/np.sum(dens)
     # return np.mean(nums/dens)
+
+
+def vif_spatial(img_ref, img_dist, win, full=False):
+    kh = 11
+    sigma = 1.5
+    sigma_nsq = 0.1
+    stride = 1
+
+    x = img_ref.astype('float32')
+    y = img_dist.astype('float32')
+
+    x_pad = np.pad(x, int((kh - stride)/2), mode='reflect')
+    y_pad = np.pad(y, int((kh - stride)/2), mode='reflect')
+
+    mu_x = convolve2d(x_pad, win, mode='valid')
+    mu_y = convolve2d(y_pad, win, mode='valid')
+
+    var_x = convolve2d(x_pad**2, win, mode='valid') - mu_x**2
+    var_y = convolve2d(y_pad**2, win, mode='valid') - mu_y**2
+
+    cov_xy = convolve2d(x_pad*y_pad, win, mode='valid') - mu_x*mu_y
+
+    mask_x = (var_x < 0)
+    mask_y = (var_y < 0)
+
+    var_x[mask_x] = 0
+    var_y[mask_y] = 0
+
+    cov_xy[mask_x + mask_y] = 0
+
+    g = cov_xy / (var_x + 1e-10)
+    sv_sq = var_y - g * cov_xy
+
+    g[var_x < 1e-10] = 0
+    sv_sq[var_x < 1e-10] = var_y[var_x < 1e-10]
+    var_x[var_x < 1e-10] = 0
+
+    g[var_y < 1e-10] = 0
+    sv_sq[var_y < 1e-10] = 0
+
+    sv_sq[g < 0] = var_x[g < 0]
+    g[g < 0] = 0
+    sv_sq[sv_sq < 1e-10] = 1e-10
+
+    vif_val = np.sum(np.log(1 + g**2 * var_x / (sv_sq + sigma_nsq)) + 1e-4)/np.sum(np.log(1 + var_x / sigma_nsq) + 1e-4)
+    if (full):
+        vif_map = (np.log(1 + g**2 * var_x / (sv_sq + sigma_nsq)) + 1e-4)/(np.log(1 + var_x / sigma_nsq) + 1e-4)
+        return (vif_val, vif_map)
+    else:
+        return vif_val
