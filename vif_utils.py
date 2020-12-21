@@ -28,11 +28,8 @@ def moments(x, y, k, stride):
 
     k_norm = k**2
 
-    # x_pad = np.pad(x, int((kh - stride)/2), mode='reflect')
-    # y_pad = np.pad(y, int((kw - stride)/2), mode='reflect')
-
-    x_pad = x
-    y_pad = y
+    x_pad = np.pad(x, int((kh - stride)/2), mode='reflect')
+    y_pad = np.pad(y, int((kw - stride)/2), mode='reflect')
 
     int_1_x = integral_image(x_pad)
     int_1_y = integral_image(y_pad)
@@ -50,7 +47,21 @@ def moments(x, y, k, stride):
 
     cov_xy = k_norm*(int_xy[:-kh:stride, :-kw:stride] - int_xy[:-kh:stride, kw::stride] - int_xy[kh::stride, :-kw:stride] + int_xy[kh::stride, kw::stride]) - mu_x*mu_y
 
-    return (mu_x/k_norm, mu_y/k_norm, var_x/k_norm**2, var_y/k_norm**2, cov_xy/k_norm**2)
+    mu_x /= k_norm
+    mu_y /= k_norm
+    var_x /= k_norm**2
+    var_x /= k_norm**2
+    cov_xy /= k_norm**2
+
+    mask_x = (var_x < 0)
+    mask_y = (var_y < 0)
+
+    var_x[mask_x] = 0
+    var_y[mask_y] = 0
+
+    cov_xy[mask_x + mask_y] = 0
+
+    return (mu_x, mu_y, var_x, var_y, cov_xy)
 
 
 def vif_gsm_model(pyr, subband_keys, M):
@@ -156,46 +167,22 @@ def vif(img_ref, img_dist):
         sigma_vsq = sigma_vsq[offset:-offset, offset:-offset]
         s = s[offset:-offset, offset:-offset]
 
-        temp = 0
-        dens[i] = 1
         for j in range(n_eigs):
-            # nums[i] += np.sum(np.log(1 + g*g*s*lamda[j]/(sigma_vsq+sigma_nsq)))
-            # dens[i] += np.sum(np.log(1 + s*lamda[j]/sigma_nsq))
-            # temp = temp + np.abs(np.log(g*g*s*lamda[j] + sigma_vsq + sigma_nsq) - np.log(s*lamda[j] + sigma_nsq))
-            temp = temp + np.sum(np.log(1 + g*g*s*lamda[j]/sigma_vsq))
-        nums[i] = np.mean(temp)
+            nums[i] += np.sum(np.log(1 + g*g*s*lamda[j]/(sigma_vsq+sigma_nsq)))
+            dens[i] += np.sum(np.log(1 + s*lamda[j]/sigma_nsq))
 
-    return np.sum(nums)/np.sum(dens)
-    # return np.mean(nums/dens)
+    return np.mean(nums)/np.mean(dens)
 
 
 def vif_spatial(img_ref, img_dist, win, full=False):
-    kh = 11
-    sigma = 1.5
+    k = 11
     sigma_nsq = 0.1
     stride = 1
 
     x = img_ref.astype('float32')
     y = img_dist.astype('float32')
 
-    x_pad = np.pad(x, int((kh - stride)/2), mode='reflect')
-    y_pad = np.pad(y, int((kh - stride)/2), mode='reflect')
-
-    mu_x = convolve2d(x_pad, win, mode='valid')
-    mu_y = convolve2d(y_pad, win, mode='valid')
-
-    var_x = convolve2d(x_pad**2, win, mode='valid') - mu_x**2
-    var_y = convolve2d(y_pad**2, win, mode='valid') - mu_y**2
-
-    cov_xy = convolve2d(x_pad*y_pad, win, mode='valid') - mu_x*mu_y
-
-    mask_x = (var_x < 0)
-    mask_y = (var_y < 0)
-
-    var_x[mask_x] = 0
-    var_y[mask_y] = 0
-
-    cov_xy[mask_x + mask_y] = 0
+    mu_x, mu_y, var_x, var_y, cov_xy = moments(x, y, k, stride)
 
     g = cov_xy / (var_x + 1e-10)
     sv_sq = var_y - g * cov_xy
