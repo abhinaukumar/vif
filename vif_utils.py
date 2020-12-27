@@ -1,6 +1,5 @@
 from pyrtools.pyramids import SteerablePyramidSpace as SPyr
 import numpy as np
-from scipy.signal import convolve2d
 
 
 def im2col(img, k, stride=1):
