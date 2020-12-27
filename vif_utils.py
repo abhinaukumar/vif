@@ -39,19 +39,13 @@ def moments(x, y, k, stride):
 
     int_xy = integral_image(x_pad*y_pad)
 
-    mu_x = (int_1_x[:-kh:stride, :-kw:stride] - int_1_x[:-kh:stride, kw::stride] - int_1_x[kh::stride, :-kw:stride] + int_1_x[kh::stride, kw::stride])
-    mu_y = (int_1_y[:-kh:stride, :-kw:stride] - int_1_y[:-kh:stride, kw::stride] - int_1_y[kh::stride, :-kw:stride] + int_1_y[kh::stride, kw::stride])
+    mu_x = (int_1_x[:-kh:stride, :-kw:stride] - int_1_x[:-kh:stride, kw::stride] - int_1_x[kh::stride, :-kw:stride] + int_1_x[kh::stride, kw::stride])/k_norm
+    mu_y = (int_1_y[:-kh:stride, :-kw:stride] - int_1_y[:-kh:stride, kw::stride] - int_1_y[kh::stride, :-kw:stride] + int_1_y[kh::stride, kw::stride])/k_norm
 
-    var_x = k_norm*(int_2_x[:-kh:stride, :-kw:stride] - int_2_x[:-kh:stride, kw::stride] - int_2_x[kh::stride, :-kw:stride] + int_2_x[kh::stride, kw::stride]) - mu_x**2
-    var_y = k_norm*(int_2_y[:-kh:stride, :-kw:stride] - int_2_y[:-kh:stride, kw::stride] - int_2_y[kh::stride, :-kw:stride] + int_2_y[kh::stride, kw::stride]) - mu_y**2
+    var_x = (int_2_x[:-kh:stride, :-kw:stride] - int_2_x[:-kh:stride, kw::stride] - int_2_x[kh::stride, :-kw:stride] + int_2_x[kh::stride, kw::stride])/k_norm - mu_x**2
+    var_y = (int_2_y[:-kh:stride, :-kw:stride] - int_2_y[:-kh:stride, kw::stride] - int_2_y[kh::stride, :-kw:stride] + int_2_y[kh::stride, kw::stride])/k_norm - mu_y**2
 
-    cov_xy = k_norm*(int_xy[:-kh:stride, :-kw:stride] - int_xy[:-kh:stride, kw::stride] - int_xy[kh::stride, :-kw:stride] + int_xy[kh::stride, kw::stride]) - mu_x*mu_y
-
-    mu_x /= k_norm
-    mu_y /= k_norm
-    var_x /= k_norm**2
-    var_x /= k_norm**2
-    cov_xy /= k_norm**2
+    cov_xy = (int_xy[:-kh:stride, :-kw:stride] - int_xy[:-kh:stride, kw::stride] - int_xy[kh::stride, :-kw:stride] + int_xy[kh::stride, kw::stride])/k_norm - mu_x*mu_y
 
     mask_x = (var_x < 0)
     mask_y = (var_y < 0)
@@ -168,8 +162,8 @@ def vif(img_ref, img_dist):
         s = s[offset:-offset, offset:-offset]
 
         for j in range(n_eigs):
-            nums[i] += np.sum(np.log(1 + g*g*s*lamda[j]/(sigma_vsq+sigma_nsq)))
-            dens[i] += np.sum(np.log(1 + s*lamda[j]/sigma_nsq))
+            nums[i] += np.mean(np.log(1 + g*g*s*lamda[j]/(sigma_vsq+sigma_nsq)))
+            dens[i] += np.mean(np.log(1 + s*lamda[j]/sigma_nsq))
 
     return np.mean(nums)/np.mean(dens)
 
