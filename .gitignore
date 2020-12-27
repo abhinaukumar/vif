@@ -11,3 +11,6 @@ logs/
 
 # Ignore vscode environment files
 .vscode/
+
+# Ignore test scripts
+python_*.py
