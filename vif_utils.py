@@ -1,4 +1,3 @@
-from pyrtools.pyramids import SteerablePyramidSpace as SPyr
 import numpy as np
 
 
@@ -124,16 +123,35 @@ def vif_channel_est(pyr_ref, pyr_dist, subband_keys, M):
     return g_all, sigma_vsq_all
 
 
-def vif(img_ref, img_dist):
+def vif(img_ref, img_dist, wavelet='steerable'):
+    assert wavelet in ['steerable', 'haar', 'db2', 'bio2.2'], 'Invalid choice of wavelet'
     M = 3
     sigma_nsq = 0.1
 
-    pyr_ref = SPyr(img_ref, 4, 5, 'reflect1').pyr_coeffs
-    pyr_dist = SPyr(img_dist, 4, 5, 'reflect1').pyr_coeffs
+    if wavelet == 'steerable':
+        from pyrtools.pyramids import SteerablePyramidSpace as SPyr
+        pyr_ref = SPyr(img_ref, 4, 5, 'reflect1').pyr_coeffs
+        pyr_dist = SPyr(img_dist, 4, 5, 'reflect1').pyr_coeffs
+        subband_keys = []
+        for key in list(pyr_ref.keys())[1:-2:3]:
+            subband_keys.append(key)
+    else:
+        from pywt import wavedec2
+        ret_ref = wavedec2(img_ref, wavelet, 'reflect', 4)
+        ret_dist = wavedec2(img_dist, wavelet, 'reflect', 4)
+        pyr_ref = {}
+        pyr_dist = {}
+        subband_keys = []
+        for i in range(4):
+            pyr_ref[(3-i, 0)] = ret_ref[i+1][0]
+            pyr_ref[(3-i, 1)] = ret_ref[i+1][1]
+            pyr_dist[(3-i, 0)] = ret_dist[i+1][0]
+            pyr_dist[(3-i, 1)] = ret_dist[i+1][1]
+            subband_keys.append((3-i, 0))
+            subband_keys.append((3-i, 1))
+        pyr_ref[4] = ret_ref[0]
+        pyr_dist[4] = ret_dist[0]
 
-    subband_keys = []
-    for key in list(pyr_ref.keys())[1:-2:3]:
-        subband_keys.append(key)
     subband_keys.reverse()
     n_subbands = len(subband_keys)
 
