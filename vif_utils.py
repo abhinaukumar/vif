@@ -185,11 +185,7 @@ def vif(img_ref, img_dist, wavelet='steerable'):
     return np.mean(nums)/np.mean(dens)
 
 
-def vif_spatial(img_ref, img_dist, win, full=False):
-    k = 11
-    sigma_nsq = 0.1
-    stride = 1
-
+def vif_spatial(img_ref, img_dist, k=11, sigma_nsq=0.1, stride=1, full=False):
     x = img_ref.astype('float32')
     y = img_dist.astype('float32')
 
