@@ -207,7 +207,34 @@ def vif_spatial(img_ref, img_dist, k=11, sigma_nsq=0.1, stride=1, full=False):
 
     vif_val = np.sum(np.log(1 + g**2 * var_x / (sv_sq + sigma_nsq)) + 1e-4)/np.sum(np.log(1 + var_x / sigma_nsq) + 1e-4)
     if (full):
-        vif_map = (np.log(1 + g**2 * var_x / (sv_sq + sigma_nsq)) + 1e-4)/(np.log(1 + var_x / sigma_nsq) + 1e-4)
-        return (vif_val, vif_map)
+        # vif_map = (np.log(1 + g**2 * var_x / (sv_sq + sigma_nsq)) + 1e-4)/(np.log(1 + var_x / sigma_nsq) + 1e-4)
+        # return (vif_val, vif_map)
+        return (np.sum(np.log(1 + g**2 * var_x / (sv_sq + sigma_nsq)) + 1e-4), np.sum(np.log(1 + var_x / sigma_nsq) + 1e-4), vif_val)
     else:
         return vif_val
+
+
+def msvif_spatial(img_ref, img_dist, k=11, sigma_nsq=0.1, stride=1, full=False):
+    x = img_ref.astype('float32')
+    y = img_dist.astype('float32')
+
+    n_levels = 5
+    nums = np.ones((n_levels,))
+    dens = np.ones((n_levels,))
+    for i in range(n_levels-1):
+        if np.min(x.shape) <= k:
+            break
+        nums[i], dens[i], _ = vif_spatial(x, y, k, sigma_nsq, stride, full=True)
+        x = x[:(x.shape[0]//2)*2, :(x.shape[1]//2)*2]
+        y = y[:(y.shape[0]//2)*2, :(y.shape[1]//2)*2]
+        x = (x[::2, ::2] + x[1::2, ::2] + x[1::2, 1::2] + x[::2, 1::2])/4
+        y = (y[::2, ::2] + y[1::2, ::2] + y[1::2, 1::2] + y[::2, 1::2])/4
+
+    if np.min(x.shape) > k:
+        nums[-1], dens[-1], _ = vif_spatial(x, y, k, sigma_nsq, stride, full=True)
+    msvifval = np.sum(nums) / np.sum(dens)
+
+    if full:
+        return msvifval, nums, dens
+    else:
+        return msvifval
