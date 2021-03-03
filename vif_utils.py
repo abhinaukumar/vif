@@ -182,7 +182,7 @@ def vif(img_ref, img_dist, wavelet='steerable'):
             nums[i] += np.mean(np.log(1 + g*g*s*lamda[j]/(sigma_vsq+sigma_nsq)))
             dens[i] += np.mean(np.log(1 + s*lamda[j]/sigma_nsq))
 
-    return np.mean(nums)/np.mean(dens)
+    return np.mean(nums + 1e-4)/np.mean(dens + 1e-4)
 
 
 def vif_spatial(img_ref, img_dist, k=11, sigma_nsq=0.1, stride=1, full=False):
