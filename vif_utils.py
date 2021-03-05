@@ -123,7 +123,7 @@ def vif_channel_est(pyr_ref, pyr_dist, subband_keys, M):
     return g_all, sigma_vsq_all
 
 
-def vif(img_ref, img_dist, wavelet='steerable'):
+def vif(img_ref, img_dist, wavelet='steerable', full=False):
     assert wavelet in ['steerable', 'haar', 'db2', 'bio2.2'], 'Invalid choice of wavelet'
     M = 3
     sigma_nsq = 0.1
@@ -182,7 +182,10 @@ def vif(img_ref, img_dist, wavelet='steerable'):
             nums[i] += np.mean(np.log(1 + g*g*s*lamda[j]/(sigma_vsq+sigma_nsq)))
             dens[i] += np.mean(np.log(1 + s*lamda[j]/sigma_nsq))
 
-    return np.mean(nums + 1e-4)/np.mean(dens + 1e-4)
+    if not full:
+        return np.mean(nums + 1e-4)/np.mean(dens + 1e-4)
+    else:
+        return np.mean(nums + 1e-4)/np.mean(dens + 1e-4), (nums + 1e-4), (dens + 1e-4)
 
 
 def vif_spatial(img_ref, img_dist, k=11, sigma_nsq=0.1, stride=1, full=False):
